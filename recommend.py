@@ -21,7 +21,8 @@ RF_WEIGHT = 0.3
 def save_uploaded_file(uploaded_file):
     """Save an uploaded file to a temporary directory and return the path"""
     with tempfile.NamedTemporaryFile(delete=False, suffix='.csv') as tmp_file:
-        tmp_file.write(uploaded_file.getvalue())
+        # Write bytes directly from the uploaded file buffer
+        tmp_file.write(uploaded_file.getbuffer())
         return tmp_file.name
 
 def load_course_data(file):
@@ -597,10 +598,12 @@ class HybridCourseRecommender:
             try:
                 if isinstance(user_data, str):
                     self.user_df = pd.read_csv(user_data)
+                    st.sidebar.success(f"Successfully loaded user data from {user_data}")
                 else:
                     # Handle uploaded file
                     file_path = save_uploaded_file(user_data)
                     self.user_df = pd.read_csv(file_path)
+                    st.sidebar.success(f"Successfully loaded uploaded user data (size: {user_data.size} bytes)")
                     # Clean up temporary file
                     os.unlink(file_path)
             except Exception as e:
@@ -687,6 +690,13 @@ def run_course_recommendation(reset_callback):
             type=["csv"],
             key="user_data"
         )
+        
+        # Debug information for file uploads
+        if course_file is not None:
+            st.sidebar.info(f"Course file uploaded: {course_file.name}, size: {course_file.size} bytes")
+            
+        if user_file is not None:
+            st.sidebar.info(f"User file uploaded: {user_file.name}, size: {user_file.size} bytes")
         
         # Initialize the recommender
         recommender = HybridCourseRecommender()
