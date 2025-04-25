@@ -1,0 +1,128 @@
+
+    <!DOCTYPE html>
+    <html>
+    <head>
+        <title>Anomaly Detection Model Performance</title>
+        <style>
+            body { font-family: Arial, sans-serif; line-height: 1.6; margin: 0; padding: 20px; color: #333; }
+            h1 { color: #2c3e50; text-align: center; margin-bottom: 30px; }
+            h2 { color: #3498db; margin-top: 40px; border-bottom: 2px solid #eee; padding-bottom: 10px; }
+            .container { max-width: 1200px; margin: 0 auto; }
+            .section { margin-bottom: 50px; }
+            .viz-container { text-align: center; margin: 20px 0; }
+            img { max-width: 100%; border: 1px solid #ddd; border-radius: 5px; box-shadow: 0 0 10px rgba(0,0,0,0.1); }
+            .description { background-color: #f9f9f9; border-left: 4px solid #3498db; padding: 15px; margin: 20px 0; }
+            .footer { text-align: center; margin-top: 50px; font-size: 0.9em; color: #7f8c8d; }
+            table { width: 100%; border-collapse: collapse; margin: 20px 0; }
+            th, td { padding: 12px 15px; text-align: left; border-bottom: 1px solid #ddd; }
+            th { background-color: #3498db; color: white; }
+            tr:nth-child(even) { background-color: #f2f2f2; }
+        </style>
+    </head>
+    <body>
+        <div class="container">
+            <h1>Anomaly Detection Model Performance Report</h1>
+            
+            <div class="section">
+                <h2>Feature Importance</h2>
+                <div class="description">
+                    <p>This visualization shows the relative importance of each feature in predicting student anomalies. 
+                    Features with higher importance have more influence on model predictions.</p>
+                </div>
+                <div class="viz-container">
+                    <img src="feature_importance.png" alt="Feature Importance">
+                </div>
+            </div>
+            
+            <div class="section">
+                <h2>Model Evaluation: Confusion Matrix</h2>
+                <div class="description">
+                    <p>The confusion matrix shows the model's prediction accuracy by comparing predicted versus actual anomaly classifications.
+                    True Positives and True Negatives indicate correct predictions, while False Positives and False Negatives show misclassifications.</p>
+                </div>
+                <div class="viz-container">
+                    <img src="confusion_matrix.png" alt="Confusion Matrix">
+                </div>
+            </div>
+            
+            <div class="section">
+                <h2>ROC Curves</h2>
+                <div class="description">
+                    <p>The ROC (Receiver Operating Characteristic) curves illustrate the performance of different scoring methods for anomaly detection.
+                    The Area Under the Curve (AUC) metric quantifies performance - higher values indicate better discrimination between normal and anomalous students.</p>
+                </div>
+                <div class="viz-container">
+                    <img src="roc_curves.png" alt="ROC Curves">
+                </div>
+            </div>
+            
+            <div class="section">
+                <h2>Dropout Risk Distribution</h2>
+                <div class="description">
+                    <p>This visualization shows the distribution of dropout risk scores across normal and at-risk students.
+                    The clear separation between the two groups indicates that our risk scoring effectively distinguishes between student populations.</p>
+                </div>
+                <div class="viz-container">
+                    <img src="dropout_risk_distribution.png" alt="Dropout Risk Distribution">
+                </div>
+            </div>
+            
+            <div class="section">
+                <h2>Feature Correlation Analysis</h2>
+                <div class="description">
+                    <p>The correlation heatmap reveals relationships between different features and anomaly status.
+                    Strong correlations (positive or negative) indicate features that tend to move together, providing insights into student behavior patterns.</p>
+                </div>
+                <div class="viz-container">
+                    <img src="correlation_heatmap.png" alt="Feature Correlation Heatmap">
+                </div>
+            </div>
+            
+            <div class="section">
+                <h2>Key Findings and Recommendations</h2>
+                <div class="description">
+                    <ul>
+                        <li>Quiz accuracy and video completion rate are the strongest predictors of student success</li>
+                        <li>Students with low engagement in multiple areas show significantly higher dropout risk</li>
+                        <li>Early intervention for students in the medium-risk category can prevent progression to high risk</li>
+                        <li>The model achieves good discrimination between normal and at-risk students (ROC AUC > 0.8)</li>
+                    </ul>
+                </div>
+                
+                <table>
+                    <tr>
+                        <th>Risk Level</th>
+                        <th>Risk Score Range</th>
+                        <th>Recommended Intervention</th>
+                    </tr>
+                    <tr>
+                        <td>Low Risk</td>
+                        <td>0.0 - 0.3</td>
+                        <td>Standard engagement, periodic progress monitoring</td>
+                    </tr>
+                    <tr>
+                        <td>Medium Risk</td>
+                        <td>0.3 - 0.6</td>
+                        <td>Targeted supplementary materials, bi-weekly check-ins</td>
+                    </tr>
+                    <tr>
+                        <td>High Risk</td>
+                        <td>0.6 - 0.8</td>
+                        <td>Academic counseling, personalized learning plan</td>
+                    </tr>
+                    <tr>
+                        <td>Extreme Risk</td>
+                        <td>0.8 - 1.0</td>
+                        <td>Immediate intervention, one-on-one tutoring, comprehensive support</td>
+                    </tr>
+                </table>
+            </div>
+            
+            <div class="footer">
+                <p>Generated on: 2025-04-25</p>
+                <p>E-Learning Analytics and Recommendation System</p>
+            </div>
+        </div>
+    </body>
+    </html>
+    
