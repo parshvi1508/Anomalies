@@ -1,4 +1,4 @@
-# E-Learning Anomaly Detection Dashboard 📊
+# ISM- E learning Analytics Dashboard 📊
 
 A Streamlit-based dashboard for analyzing student learning patterns, detecting anomalies, and predicting dropout risks in e-learning environments.
 

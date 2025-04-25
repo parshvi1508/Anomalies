@@ -12,7 +12,7 @@ warnings.filterwarnings('ignore')
 
 # Page Configuration
 st.set_page_config(
-    page_title="E-Learning Analytics Platform",
+    page_title="ISM- E learning Analytics and Recommendation System",
     layout="wide",
     initial_sidebar_state="expanded",
     page_icon="📊"
@@ -93,7 +93,7 @@ def load_and_process_data(uploaded_file):
 
 def run_anomaly_detection(reset_callback):
     """Run the anomaly detection section of the app"""
-    st.markdown("<h1 class='sub-header'>🔍 E-Learning Anomaly Detection Dashboard</h1>", unsafe_allow_html=True)
+    st.markdown("<h1 class='sub-header'>🔍 ISM- E learning Analytics Dashboard</h1>", unsafe_allow_html=True)
     st.button("← Back to Home", on_click=reset_callback)
     
     st.markdown("""
@@ -745,10 +745,10 @@ def recommend_courses_based_on_quiz(quiz_score):
 
 # Home Page
 if st.session_state.page == 'home':
-    st.markdown("<h1 class='main-header'>📚 E-Learning Analytics Platform</h1>", unsafe_allow_html=True)
+    st.markdown("<h1 class='main-header'>📚 ISM- E learning Analytics and Recommendation System</h1>", unsafe_allow_html=True)
     
     st.markdown("""
-    Welcome to the E-Learning Analytics Platform, a comprehensive solution for improving learning outcomes through 
+    Welcome to the ISM- E learning Analytics and Recommendation System, a comprehensive solution for improving learning outcomes through 
     data-driven insights and personalized recommendations.
     """)
     
@@ -833,7 +833,7 @@ if st.session_state.page == 'home':
     # Footer
     st.markdown("""
     <div class='footer'>
-        <p>© 2023 E-Learning Analytics Platform | Powered by Machine Learning & Data Science</p>
+        <p>© 2023 ISM- E learning Analytics and Recommendation System | Powered by Machine Learning & Data Science</p>
     </div>
     """, unsafe_allow_html=True)
 

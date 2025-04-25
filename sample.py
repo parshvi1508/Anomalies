@@ -17,7 +17,7 @@ warnings.filterwarnings('ignore')
 
 # Page Configuration
 st.set_page_config(
-    page_title="E-Learning Analytics Platform",
+    page_title="ISM- E learning Analytics and Recommendation System",
     layout="wide",
     initial_sidebar_state="expanded"
 )
@@ -131,7 +131,7 @@ def detect_anomalies(df):
 
 def run_anomaly_detection(reset_callback):
     """Run the anomaly detection section of the app"""
-    st.title("📊 E-Learning Anomaly Detection Dashboard")
+    st.title("📊 ISM- E learning Analytics Dashboard")
     st.button("← Back to Home", on_click=reset_callback)
     
     st.markdown("""
@@ -646,10 +646,10 @@ def run_anomaly_detection(reset_callback):
 
 # Home Page
 if st.session_state.page == 'home':
-    st.title("📚 E-Learning Analytics Platform")
+    st.title("📚 ISM- E learning Analytics and Recommendation System")
     
     st.markdown("""
-    ### Welcome to the E-Learning Analytics Platform
+    ### Welcome to the ISM- E learning Analytics and Recommendation System
     
     This platform offers two main features:
     """)

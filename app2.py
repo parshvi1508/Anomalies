@@ -14,13 +14,13 @@ warnings.filterwarnings('ignore')
 
 # Page Configuration
 st.set_page_config(
-    page_title="E-Learning Anomaly Detection",
+    page_title="ISM- E learning Analytics Dashboard",
     layout="wide",
     initial_sidebar_state="expanded"
 )
 
 # Title and Description
-st.title("📊 E-Learning Anomaly Detection Dashboard")
+st.title("📊 ISM- E learning Analytics Dashboard")
 st.markdown("""
     This dashboard helps identify and analyze student learning patterns.
     Upload your student data to begin the analysis.

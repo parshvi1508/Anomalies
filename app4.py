@@ -5,7 +5,7 @@ import plotly.express as px
 import plotly.graph_objects as go
 from PIL import Image
 import os
-#from course_recommendation import run_course_recommendation
+from course_recommendation import run_course_recommendation
 from model_utils2 import detect_anomalies, train_model
 import warnings
 warnings.filterwarnings('ignore')
@@ -507,6 +507,50 @@ def run_anomaly_detection(reset_callback):
                         issues.append("high_location_changes")
                     
                     # Generate recommendations based on issues
+                    def generate_student_recommendations(issues, student_data):
+                        recommendations = {
+                            "Learning Strategy": [],
+                            "Engagement": [],
+                            "Technical": []
+                        }
+                        
+                        if "low_quiz_scores" in issues:
+                            recommendations["Learning Strategy"].extend([
+                                "Review course materials before attempting quizzes",
+                                "Schedule regular study sessions",
+                                "Consider joining study groups"
+                            ])
+                        
+                        if "low_video_completion" in issues:
+                            recommendations["Learning Strategy"].extend([
+                                "Break video lectures into smaller segments",
+                                "Take notes while watching videos",
+                                "Set daily video watching goals"
+                            ])
+                        
+                        if "low_engagement" in issues:
+                            recommendations["Engagement"].extend([
+                                "Participate in forum discussions regularly",
+                                "Ask questions when concepts are unclear",
+                                "Connect with other students"
+                            ])
+                        
+                        if "high_video_time" in issues:
+                            recommendations["Technical"].extend([
+                                "Use video playback speed controls",
+                                "Create a focused learning environment",
+                                "Take structured breaks between videos"
+                            ])
+                        
+                        if "high_location_changes" in issues:
+                            recommendations["Technical"].extend([
+                                "Establish a consistent study location",
+                                "Ensure stable internet connection",
+                                "Download materials for offline access"
+                            ])
+                        
+                        return recommendations
+
                     recommendations = generate_student_recommendations(issues, student_data)
                     
                     # Display recommendations
@@ -521,6 +565,25 @@ def run_anomaly_detection(reset_callback):
                             st.markdown("Based on quiz performance, we recommend the following resources:")
                             
                             # Course recommendations based on quiz score
+                            def recommend_courses_based_on_quiz(quiz_score):
+                                if quiz_score < 40:
+                                    return [
+            {"title": "Basic Concepts Review", "description": "A foundational course covering core concepts", "platform": "Byjus", "link": "#"},
+            {"title": "Study Skills Fundamentals", "description": "Learn effective study techniques with personalized motivation", "platform": "Byjus", "link": "#"},
+            {"title": "Interactive Practice Exercises", "description": "Additional practice problems with solutions and assessment", "platform": "Skillshare", "link": "#"}
+        ]
+                                elif quiz_score < 70:
+                                    return [
+            {"title": "Intermediate Practice", "description": "Targeted exercises with performance metrics", "platform": "Byjus", "link": "#"},
+            {"title": "Topic Deep Dive", "description": "Detailed explanations aligned with learning objectives", "platform": "upGrad", "link": "#"},
+            {"title": "Problem-Solving Strategies", "description": "Advanced techniques with engaging discussion forums", "platform": "Byjus", "link": "#"}
+        ]
+                                else:
+                                    return [
+            {"title": "Advanced Topics", "description": "Challenging material with comprehensive learning paths", "platform": "Udemy", "link": "#"},
+            {"title": "Expert Level Content", "description": "Specialized concepts with adaptive learning styles", "platform": "edX", "link": "#"},
+            {"title": "Mastery Projects", "description": "Apply knowledge with high engagement and satisfaction metrics", "platform": "upGrad", "link": "#"}
+        ]
                             courses = recommend_courses_based_on_quiz(student_data['quiz_accuracy'])
                             
                             for i, course in enumerate(courses):
@@ -589,262 +652,107 @@ def run_anomaly_detection(reset_callback):
                     # Interactive goal setting
                     st.markdown("### 🎯 Goal Setting")
                     
-                    goal_col1, goal_col2 = st.columns(2)
+                    st.write("Set personalized improvement goals for this student:")
+                    st.plotly_chart(fig, use_container_width=True)
                     
-                    with goal_col1:
-                        if student_data['quiz_accuracy'] < 80:
-                            target_score = st.slider(
-                                "Target Quiz Score (%)", 
-                                int(student_data['quiz_accuracy']), 
-                                100, 
-                                int(student_data['quiz_accuracy'] + 15)
-                            )
-                            score_improvement = target_score - student_data['quiz_accuracy']
-                            st.success(f"Target: Improve quiz score by {score_improvement:.1f}% points")
+                    # Interactive goal setting
+                    st.markdown("### 🎯 Goal Setting")
                     
-                    with goal_col2:
-                        if student_data['video_completion_rate'] < 90:
-                            target_completion = st.slider(
-                                "Target Video Completion (%)", 
-                                int(student_data['video_completion_rate']), 
-                                100, 
-                                int(min(100, student_data['video_completion_rate'] + 20))
+                    st.write("Set personalized improvement goals for this student:")
+                    
+                    col1, col2 = st.columns(2)
+                    
+                    with col1:
+                        quiz_goal = st.slider(
+                            "Quiz Score Goal (%)", 
+                            min_value=int(student_data['quiz_accuracy']), 
+                            max_value=100, 
+                            value=min(int(student_data['quiz_accuracy'] + 15), 100)
+                        )
+                        
+                        completion_goal = st.slider(
+                            "Video Completion Goal (%)", 
+                            min_value=int(student_data['video_completion_rate']), 
+                            max_value=100, 
+                            value=min(int(student_data['video_completion_rate'] + 20), 100)
+                        )
+                    
+                    with col2:
+                        forum_goal = st.slider(
+                            "Forum Activity Goal (posts)", 
+                            min_value=int(student_data['forum_activity']), 
+                            max_value=20, 
+                            value=min(int(student_data['forum_activity'] + 3), 20)
+                        )
+                        
+                        if "low_video_completion" in issues:
+                            time_goal = st.slider(
+                                "Target Minutes per Video", 
+                                min_value=10, 
+                                max_value=int(student_data['avg_time_per_video']), 
+                                value=max(20, int(student_data['avg_time_per_video']) - 10)
                             )
-                            completion_improvement = target_completion - student_data['video_completion_rate']
-                            st.success(f"Target: Improve video completion by {completion_improvement:.1f}% points")
+                    
+                    # Display goal summary
+                    st.markdown("#### Goal Summary")
+                    
+                    # Calculate improvement percentages
+                    quiz_improvement = ((quiz_goal - student_data['quiz_accuracy']) / student_data['quiz_accuracy']) * 100
+                    completion_improvement = ((completion_goal - student_data['video_completion_rate']) / max(1, student_data['video_completion_rate'])) * 100
+                    forum_improvement = ((forum_goal - student_data['forum_activity']) / max(1, student_data['forum_activity'])) * 100
+                    
+                    # Create a progress tracking chart
+                    improvement_data = {
+                        'Metric': ['Quiz Score', 'Video Completion', 'Forum Activity'],
+                        'Current': [student_data['quiz_accuracy'], student_data['video_completion_rate'], student_data['forum_activity']],
+                        'Goal': [quiz_goal, completion_goal, forum_goal]
+                    }
+                    
+                    df_goals = pd.DataFrame(improvement_data)
+                    
+                    fig_goals = go.Figure()
+                    
+                    for i, row in df_goals.iterrows():
+                        fig_goals.add_trace(go.Bar(
+                            name='Current',
+                            x=[row['Metric']],
+                            y=[row['Current']],
+                            marker_color='royalblue'
+                        ))
+                        fig_goals.add_trace(go.Bar(
+                            name='Goal',
+                            x=[row['Metric']],
+                            y=[row['Goal']],
+                            marker_color='lightgreen'
+                        ))
+                    
+                    # Customize layout
+                    fig_goals.update_layout(
+                        barmode='group',
+                        title="Current Values vs. Goals",
+                        yaxis_title="Value",
+                        legend_title="Status"
+                    )
+                    
+                    st.plotly_chart(fig_goals, use_container_width=True)
+                    courses = recommend_courses_based_on_quiz(student_data['quiz_accuracy'])
 
-# Function to generate personalized recommendations
-def generate_student_recommendations(issues, student_data):
-    """Generate personalized recommendations based on identified issues"""
-    recommendations = {}
-    
-    if "low_quiz_scores" in issues:
-        quiz_score = student_data['quiz_accuracy']
-        recommendations["Academic Performance"] = [
-            "Schedule a one-on-one tutoring session to address knowledge gaps",
-            "Review quiz questions with detailed explanations of correct answers",
-            "Create a personalized study plan focusing on weak areas",
-            "Provide additional practice materials with immediate feedback"
-        ]
-        
-        if quiz_score < 30:
-            recommendations["Academic Performance"].append("Consider fundamental skill assessment to identify prerequisite knowledge gaps")
-    
-    if "low_video_completion" in issues:
-        video_completion = student_data['video_completion_rate']
-        recommendations["Content Engagement"] = [
-            "Break down longer videos into shorter, focused segments",
-            "Add interactive elements to videos to boost engagement",
-            "Implement knowledge checkpoints within videos",
-            "Provide video summaries and key points as supplementary material"
-        ]
-        
-        if video_completion < 40:
-            recommendations["Content Engagement"].append("Check for technical issues affecting video playback")
-    
-    if "low_engagement" in issues:
-        forum_posts = student_data['forum_activity']
-        recommendations["Community Engagement"] = [
-            "Assign peer collaboration activities",
-            "Create discussion prompts related to real-world applications",
-            "Recognize and reward active participation",
-            "Schedule synchronous discussion sessions"
-        ]
-        
-        if forum_posts < 1:
-            recommendations["Community Engagement"].append("Send a personal welcome message to encourage initial participation")
-    
-    if "high_video_time" in issues:
-        avg_time = student_data['avg_time_per_video']
-        recommendations["Learning Efficiency"] = [
-            "Provide guided notes to focus attention on key concepts",
-            "Recommend video playback at 1.25x or 1.5x speed",
-            "Suggest the Pomodoro technique (25-minute focused study sessions)",
-            "Teach active learning strategies like the Cornell note-taking method"
-        ]
-        
-        if avg_time > 60:
-            recommendations["Learning Efficiency"].append("Check if student is pausing/rewatching repeatedly - might indicate confusion")
-    
-    if "high_location_changes" in issues:
-        location_changes = student_data['location_change']
-        recommendations["Learning Environment"] = [
-            "Recommend creating a dedicated study space",
-            "Provide offline access to course materials",
-            "Suggest time blocking for focused learning sessions",
-            "Share tips for minimizing distractions in different environments"
-        ]
-    
-    # Add motivational strategies for all students
-    recommendations["Motivation Strategies"] = [
-        "Set up milestone celebrations for course progress",
-        "Visualize progress with personalized learning dashboards",
-        "Connect course concepts to student's stated career goals",
-        "Provide real-world examples relevant to student interests"
-    ]
-    
-    return recommendations
-
-# Function to recommend courses based on quiz scores
-def recommend_courses_based_on_quiz(quiz_score):
-    """Recommend learning resources based on quiz performance"""
-    if quiz_score < 40:  # Struggling students
-        return [
-            {
-                "title": "Foundations: Building Core Knowledge",
-                "description": "This course covers the fundamental concepts needed to succeed in more advanced material. Includes interactive exercises and step-by-step tutorials.",
-                "link": "https://example.com/foundations"
-            },
-            {
-                "title": "Study Skills Mastery",
-                "description": "Learn effective learning strategies, note-taking techniques, and memory methods to improve knowledge retention and test performance.",
-                "link": "https://example.com/study-skills"
-            },
-            {
-                "title": "Guided Practice: From Basics to Application",
-                "description": "Structured practice sessions with immediate feedback and detailed explanations of common mistakes.",
-                "link": "https://example.com/guided-practice"
-            }
-        ]
-    elif quiz_score < 70:  # Intermediate students
-        return [
-            {
-                "title": "Skill Builder: Advancing Your Knowledge",
-                "description": "Bridge the gap between foundational concepts and advanced applications with guided practice and case studies.",
-                "link": "https://example.com/skill-builder"
-            },
-            {
-                "title": "Problem-Solving Workshop",
-                "description": "Enhance your analytical thinking and solution development through structured problem-solving frameworks.",
-                "link": "https://example.com/problem-solving"
-            },
-            {
-                "title": "Concept Mastery Series",
-                "description": "Deep dives into key concepts with visual explanations, interactive demos, and practical applications.",
-                "link": "https://example.com/concept-mastery"
-            }
-        ]
-    else:  # Advanced students
-        return [
-            {
-                "title": "Advanced Applications and Case Studies",
-                "description": "Explore complex real-world applications and develop critical analysis skills through challenging case studies.",
-                "link": "https://example.com/advanced-applications"
-            },
-            {
-                "title": "Research Methods and Advanced Topics",
-                "description": "Learn cutting-edge developments and research methodologies to take your knowledge to expert level.",
-                "link": "https://example.com/research-methods"
-            },
-            {
-                "title": "Integration and Synthesis Workshop",
-                "description": "Connect concepts across different domains and develop innovative solutions to complex problems.",
-                "link": "https://example.com/integration-synthesis"
-            }
-        ]
-
-# Home Page
-if st.session_state.page == 'home':
-    st.markdown("<h1 class='main-header'>📚 ISM- E learning Analytics and Recommendation System</h1>", unsafe_allow_html=True)
-    
-    st.markdown("""
-    Welcome to the ISM- E learning Analytics and Recommendation System, a comprehensive solution for improving learning outcomes through 
-    data-driven insights and personalized recommendations.
-    """)
-    
-    # Feature cards
-    st.markdown("### Platform Features")
-    
-    col1, col2 = st.columns(2)
-    
-    with col1:
-        st.markdown("""
-        <div class='feature-card anomaly-card'>
-            <h3>🔍 Learning Pattern Analysis</h3>
-            <p>Identify students who may be struggling or showing unusual learning patterns through advanced analytics.</p>
-            <p><b>Key capabilities:</b></p>
-            <ul>
-                <li>Detect at-risk students early</li>
-                <li>Analyze engagement patterns</li>
-                <li>Track performance metrics</li>
-                <li>Generate personalized recommendations</li>
-            </ul>
-        </div>
-        """, unsafe_allow_html=True)
-        
-        st.button("Anomaly Detection Dashboard", on_click=navigate_to_anomalies, use_container_width=True)
-    
-    with col2:
-        st.markdown("""
-        <div class='feature-card recommendation-card'>
-            <h3>📚 Course Recommendation Engine</h3>
-            <p>Get personalized course recommendations based on learning preferences, interests, and performance data.</p>
-            <p><b>Key capabilities:</b></p>
-            <ul>
-                <li>Content-based filtering</li>
-                <li>Preference matching</li>
-                <li>Experience-level appropriate suggestions</li>
-                <li>Platform and cost optimization</li>
-            </ul>
-        </div>
-        """, unsafe_allow_html=True)
-        
-        st.button("Course Recommendation Engine", on_click=navigate_to_recommendations, use_container_width=True)
-    
-    # Dashboard preview image
-    st.markdown("### Platform Overview")
-    
-    # Use a sample dashboard image - replace with your actual dashboard preview
-    st.image("https://img.freepik.com/free-vector/education-horizontal-typography-banner-set-with-learning-knowledge-symbols-flat-illustration_1284-29493.jpg", 
-             caption="E-Learning Analytics Dashboard")
-    
-    # Benefits section
-    st.markdown("### Benefits")
-    
-    benefit_col1, benefit_col2, benefit_col3 = st.columns(3)
-    
-    with benefit_col1:
-        st.markdown("""
-        #### 👨‍🎓 For Students
-        - Personalized learning paths
-        - Early intervention when struggling
-        - Tailored resource recommendations
-        - Progress tracking and goal setting
-        """)
-    
-    with benefit_col2:
-        st.markdown("""
-        #### 👨‍🏫 For Instructors
-        - Identify at-risk students quickly
-        - Understand content effectiveness
-        - Target interventions efficiently
-        - Data-driven course improvements
-        """)
-    
-    with benefit_col3:
-        st.markdown("""
-        #### 🏫 For Institutions
-        - Improve completion rates
-        - Enhance student satisfaction
-        - Optimize learning resources
-        - Scale personalized education
-        """)
-    
-    # Footer
-    st.markdown("""
-    <div class='footer'>
-        <p>© 2023 ISM- E learning Analytics and Recommendation System | Powered by Machine Learning & Data Science</p>
-    </div>
-    """, unsafe_allow_html=True)
-
-# Anomaly Detection Page
-elif st.session_state.page == 'anomalies':
-    run_anomaly_detection(reset_to_home)
-
-# Course Recommendation Page
-#elif st.session_state.page == 'recommendations':
-    #run_course_recommendation(reset_to_home)
-
-if __name__ == "__main__":
-    # This will run when the script is executed directly
-    pass
+                    for i, course in enumerate(courses):
+                        st.markdown(f"**{i+1}. {course['title']}**")
+                        st.markdown(f"📋 {course['description']}")
+                        st.markdown(f"🏫 **Platform:** {course['platform']}")
+                        st.markdown(f"🔗 [Access Course]({course['link']})")
+                        st.markdown("---")
+                    # Goal commitment
+                    with st.form("goal_commitment"):
+                        st.markdown("#### Commit to these goals")
+                        notes = st.text_area("Add notes or action items:", 
+                                            placeholder="e.g., Schedule weekly check-ins, provide additional resources...")
+                        deadline = st.date_input("Target completion date:")
+                        
+                        submitted = st.form_submit_button("Save Goals")
+                        if submitted:
+                            st.success(f"✅ Goals for Student {selected_student} have been saved!")
+                            
+                            # Here you would typically save the goals to a database
+                            st.balloons()
