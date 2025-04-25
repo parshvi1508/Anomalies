@@ -5,7 +5,8 @@ import plotly.express as px
 import plotly.graph_objects as go
 from PIL import Image
 import os
-from course_recommendation import run_course_recommendation
+from recommend import run_course_recommendation
+
 from model_utils2 import detect_anomalies, train_model
 import warnings
 warnings.filterwarnings('ignore')
@@ -90,6 +91,195 @@ def load_and_process_data(uploaded_file):
     except Exception as e:
         st.error(f"❌ Error loading file: {str(e)}")
         return None
+
+
+# Function to generate personalized recommendations
+def generate_student_recommendations(issues, student_data):
+    """Generate personalized recommendations based on identified issues"""
+    recommendations = {}
+    
+    if "low_quiz_scores" in issues:
+        quiz_score = student_data['quiz_accuracy']
+        recommendations["Academic Performance"] = [
+            "Schedule a one-on-one tutoring session to address knowledge gaps",
+            "Review quiz questions with detailed explanations of correct answers",
+            "Create a personalized study plan focusing on weak areas",
+            "Provide additional practice materials with immediate feedback"
+        ]
+        
+        if quiz_score < 30:
+            recommendations["Academic Performance"].append("Consider fundamental skill assessment to identify prerequisite knowledge gaps")
+    
+    if "low_video_completion" in issues:
+        video_completion = student_data['video_completion_rate']
+        recommendations["Content Engagement"] = [
+            "Break down longer videos into shorter, focused segments",
+            "Add interactive elements to videos to boost engagement",
+            "Implement knowledge checkpoints within videos",
+            "Provide video summaries and key points as supplementary material"
+        ]
+        
+        if video_completion < 40:
+            recommendations["Content Engagement"].append("Check for technical issues affecting video playback")
+    
+    if "low_engagement" in issues:
+        forum_posts = student_data['forum_activity']
+        recommendations["Community Engagement"] = [
+            "Assign peer collaboration activities",
+            "Create discussion prompts related to real-world applications",
+            "Recognize and reward active participation",
+            "Schedule synchronous discussion sessions"
+        ]
+        
+        if forum_posts < 1:
+            recommendations["Community Engagement"].append("Send a personal welcome message to encourage initial participation")
+    
+    if "high_video_time" in issues:
+        avg_time = student_data['avg_time_per_video']
+        recommendations["Learning Efficiency"] = [
+            "Provide guided notes to focus attention on key concepts",
+            "Recommend video playback at 1.25x or 1.5x speed",
+            "Suggest the Pomodoro technique (25-minute focused study sessions)",
+            "Teach active learning strategies like the Cornell note-taking method"
+        ]
+        
+        if avg_time > 60:
+            recommendations["Learning Efficiency"].append("Check if student is pausing/rewatching repeatedly - might indicate confusion")
+    
+    if "high_location_changes" in issues:
+        location_changes = student_data['location_change']
+        recommendations["Learning Environment"] = [
+            "Recommend creating a dedicated study space",
+            "Provide offline access to course materials",
+            "Suggest time blocking for focused learning sessions",
+            "Share tips for minimizing distractions in different environments"
+        ]
+    
+    # Add motivational strategies for all students
+    recommendations["Motivation Strategies"] = [
+        "Set up milestone celebrations for course progress",
+        "Visualize progress with personalized learning dashboards",
+        "Connect course concepts to student's stated career goals",
+        "Provide real-world examples relevant to student interests"
+    ]
+    
+    return recommendations
+
+# Function to recommend courses based on quiz scores
+def recommend_courses_based_on_quiz(quiz_score):
+    """Recommend learning resources based on quiz performance"""
+    if quiz_score < 40:  # Struggling students
+        return [
+            {
+                "title": "Foundations: Building Core Knowledge",
+                "description": "This course covers the fundamental concepts needed to succeed in more advanced material. Includes interactive exercises and step-by-step tutorials.",
+                "link": "https://example.com/foundations"
+            },
+            {
+                "title": "Study Skills Mastery",
+                "description": "Learn effective learning strategies, note-taking techniques, and memory methods to improve knowledge retention and test performance.",
+                "link": "https://example.com/study-skills"
+            },
+            {
+                "title": "Guided Practice: From Basics to Application",
+                "description": "Structured practice sessions with immediate feedback and detailed explanations of common mistakes.",
+                "link": "https://example.com/guided-practice"
+            }
+        ]
+    elif quiz_score < 70:  # Intermediate students
+        return [
+            {
+                "title": "Skill Builder: Advancing Your Knowledge",
+                "description": "Bridge the gap between foundational concepts and advanced applications with guided practice and case studies.",
+                "link": "https://example.com/skill-builder"
+            },
+            {
+                "title": "Problem-Solving Workshop",
+                "description": "Enhance your analytical thinking and solution development through structured problem-solving frameworks.",
+                "link": "https://example.com/problem-solving"
+            },
+            {
+                "title": "Concept Mastery Series",
+                "description": "Deep dives into key concepts with visual explanations, interactive demos, and practical applications.",
+                "link": "https://example.com/concept-mastery"
+            }
+        ]
+    else:  # Advanced students
+        return [
+            {
+                "title": "Advanced Applications and Case Studies",
+                "description": "Explore complex real-world applications and develop critical analysis skills through challenging case studies.",
+                "link": "https://example.com/advanced-applications"
+            },
+            {
+                "title": "Research Methods and Advanced Topics",
+                "description": "Learn cutting-edge developments and research methodologies to take your knowledge to expert level.",
+                "link": "https://example.com/research-methods"
+            },
+            {
+                "title": "Integration and Synthesis Workshop",
+                "description": "Connect concepts across different domains and develop innovative solutions to complex problems.",
+                "link": "https://example.com/integration-synthesis"
+            }
+        ]
+
+
+def recommend_courses_based_on_quiz(quiz_score):
+    """Recommend learning resources based on quiz performance"""
+    if quiz_score < 40:  # Struggling students
+        return [
+            {
+                "title": "Foundations: Building Core Knowledge",
+                "description": "This course covers the fundamental concepts needed to succeed in more advanced material. Includes interactive exercises and step-by-step tutorials.",
+                "link": "https://example.com/foundations"
+            },
+            {
+                "title": "Study Skills Mastery",
+                "description": "Learn effective learning strategies, note-taking techniques, and memory methods to improve knowledge retention and test performance.",
+                "link": "https://example.com/study-skills"
+            },
+            {
+                "title": "Guided Practice: From Basics to Application",
+                "description": "Structured practice sessions with immediate feedback and detailed explanations of common mistakes.",
+                "link": "https://example.com/guided-practice"
+            }
+        ]
+    elif quiz_score < 70:  # Intermediate students
+        return [
+            {
+                "title": "Skill Builder: Advancing Your Knowledge",
+                "description": "Bridge the gap between foundational concepts and advanced applications with guided practice and case studies.",
+                "link": "https://example.com/skill-builder"
+            },
+            {
+                "title": "Problem-Solving Workshop",
+                "description": "Enhance your analytical thinking and solution development through structured problem-solving frameworks.",
+                "link": "https://example.com/problem-solving"
+            },
+            {
+                "title": "Concept Mastery Series",
+                "description": "Deep dives into key concepts with visual explanations, interactive demos, and practical applications.",
+                "link": "https://example.com/concept-mastery"
+            }
+        ]
+    else:  # Advanced students
+        return [
+            {
+                "title": "Advanced Applications and Case Studies",
+                "description": "Explore complex real-world applications and develop critical analysis skills through challenging case studies.",
+                "link": "https://example.com/advanced-applications"
+            },
+            {
+                "title": "Research Methods and Advanced Topics",
+                "description": "Learn cutting-edge developments and research methodologies to take your knowledge to expert level.",
+                "link": "https://example.com/research-methods"
+            },
+            {
+                "title": "Integration and Synthesis Workshop",
+                "description": "Connect concepts across different domains and develop innovative solutions to complex problems.",
+                "link": "https://example.com/integration-synthesis"
+            }
+        ]
 
 def run_anomaly_detection(reset_callback):
     """Run the anomaly detection section of the app"""
@@ -613,136 +803,6 @@ def run_anomaly_detection(reset_callback):
                             completion_improvement = target_completion - student_data['video_completion_rate']
                             st.success(f"Target: Improve video completion by {completion_improvement:.1f}% points")
 
-# Function to generate personalized recommendations
-def generate_student_recommendations(issues, student_data):
-    """Generate personalized recommendations based on identified issues"""
-    recommendations = {}
-    
-    if "low_quiz_scores" in issues:
-        quiz_score = student_data['quiz_accuracy']
-        recommendations["Academic Performance"] = [
-            "Schedule a one-on-one tutoring session to address knowledge gaps",
-            "Review quiz questions with detailed explanations of correct answers",
-            "Create a personalized study plan focusing on weak areas",
-            "Provide additional practice materials with immediate feedback"
-        ]
-        
-        if quiz_score < 30:
-            recommendations["Academic Performance"].append("Consider fundamental skill assessment to identify prerequisite knowledge gaps")
-    
-    if "low_video_completion" in issues:
-        video_completion = student_data['video_completion_rate']
-        recommendations["Content Engagement"] = [
-            "Break down longer videos into shorter, focused segments",
-            "Add interactive elements to videos to boost engagement",
-            "Implement knowledge checkpoints within videos",
-            "Provide video summaries and key points as supplementary material"
-        ]
-        
-        if video_completion < 40:
-            recommendations["Content Engagement"].append("Check for technical issues affecting video playback")
-    
-    if "low_engagement" in issues:
-        forum_posts = student_data['forum_activity']
-        recommendations["Community Engagement"] = [
-            "Assign peer collaboration activities",
-            "Create discussion prompts related to real-world applications",
-            "Recognize and reward active participation",
-            "Schedule synchronous discussion sessions"
-        ]
-        
-        if forum_posts < 1:
-            recommendations["Community Engagement"].append("Send a personal welcome message to encourage initial participation")
-    
-    if "high_video_time" in issues:
-        avg_time = student_data['avg_time_per_video']
-        recommendations["Learning Efficiency"] = [
-            "Provide guided notes to focus attention on key concepts",
-            "Recommend video playback at 1.25x or 1.5x speed",
-            "Suggest the Pomodoro technique (25-minute focused study sessions)",
-            "Teach active learning strategies like the Cornell note-taking method"
-        ]
-        
-        if avg_time > 60:
-            recommendations["Learning Efficiency"].append("Check if student is pausing/rewatching repeatedly - might indicate confusion")
-    
-    if "high_location_changes" in issues:
-        location_changes = student_data['location_change']
-        recommendations["Learning Environment"] = [
-            "Recommend creating a dedicated study space",
-            "Provide offline access to course materials",
-            "Suggest time blocking for focused learning sessions",
-            "Share tips for minimizing distractions in different environments"
-        ]
-    
-    # Add motivational strategies for all students
-    recommendations["Motivation Strategies"] = [
-        "Set up milestone celebrations for course progress",
-        "Visualize progress with personalized learning dashboards",
-        "Connect course concepts to student's stated career goals",
-        "Provide real-world examples relevant to student interests"
-    ]
-    
-    return recommendations
-
-# Function to recommend courses based on quiz scores
-def recommend_courses_based_on_quiz(quiz_score):
-    """Recommend learning resources based on quiz performance"""
-    if quiz_score < 40:  # Struggling students
-        return [
-            {
-                "title": "Foundations: Building Core Knowledge",
-                "description": "This course covers the fundamental concepts needed to succeed in more advanced material. Includes interactive exercises and step-by-step tutorials.",
-                "link": "https://example.com/foundations"
-            },
-            {
-                "title": "Study Skills Mastery",
-                "description": "Learn effective learning strategies, note-taking techniques, and memory methods to improve knowledge retention and test performance.",
-                "link": "https://example.com/study-skills"
-            },
-            {
-                "title": "Guided Practice: From Basics to Application",
-                "description": "Structured practice sessions with immediate feedback and detailed explanations of common mistakes.",
-                "link": "https://example.com/guided-practice"
-            }
-        ]
-    elif quiz_score < 70:  # Intermediate students
-        return [
-            {
-                "title": "Skill Builder: Advancing Your Knowledge",
-                "description": "Bridge the gap between foundational concepts and advanced applications with guided practice and case studies.",
-                "link": "https://example.com/skill-builder"
-            },
-            {
-                "title": "Problem-Solving Workshop",
-                "description": "Enhance your analytical thinking and solution development through structured problem-solving frameworks.",
-                "link": "https://example.com/problem-solving"
-            },
-            {
-                "title": "Concept Mastery Series",
-                "description": "Deep dives into key concepts with visual explanations, interactive demos, and practical applications.",
-                "link": "https://example.com/concept-mastery"
-            }
-        ]
-    else:  # Advanced students
-        return [
-            {
-                "title": "Advanced Applications and Case Studies",
-                "description": "Explore complex real-world applications and develop critical analysis skills through challenging case studies.",
-                "link": "https://example.com/advanced-applications"
-            },
-            {
-                "title": "Research Methods and Advanced Topics",
-                "description": "Learn cutting-edge developments and research methodologies to take your knowledge to expert level.",
-                "link": "https://example.com/research-methods"
-            },
-            {
-                "title": "Integration and Synthesis Workshop",
-                "description": "Connect concepts across different domains and develop innovative solutions to complex problems.",
-                "link": "https://example.com/integration-synthesis"
-            }
-        ]
-
 # Home Page
 if st.session_state.page == 'home':
     st.markdown("<h1 class='main-header'>📚 ISM- E learning Analytics and Recommendation System</h1>", unsafe_allow_html=True)
@@ -833,7 +893,7 @@ if st.session_state.page == 'home':
     # Footer
     st.markdown("""
     <div class='footer'>
-        <p>© 2023 ISM- E learning Analytics and Recommendation System | Powered by Machine Learning & Data Science</p>
+        <p>© 2025 ISM- E learning Analytics and Recommendation System | Powered by Machine Learning & Data Science</p>
     </div>
     """, unsafe_allow_html=True)
 
@@ -841,7 +901,7 @@ if st.session_state.page == 'home':
 elif st.session_state.page == 'anomalies':
     run_anomaly_detection(reset_to_home)
 
-# Course Recommendation Page - Updated to include the course recommendation functionality
+# Course Recommendation Page 
 elif st.session_state.page == 'recommendations':
     run_course_recommendation(reset_to_home)
 
