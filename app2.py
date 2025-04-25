@@ -262,8 +262,45 @@ if uploaded_file:
                                 "• Assign study group",
                                 "• Schedule collaborative sessions"
                             ])
-                        
+                        # Add personalized learning path recommendations
                         st.info("\n".join(recommendations))
+                        
+                        # Personalized Learning Path section
+                        st.subheader("🛤️ Personalized Learning Path")
+                        
+                        if student['quiz_accuracy'] >= 70:
+                            st.success("**Advanced Learner**")
+                            learning_path = [
+                                "• Offer accelerated tracks with optional advanced modules",
+                                "• Unlock challenge tasks and badges",
+                                "• Award badges and certificates for milestone achievements",
+                                "• Provide access to additional research materials",
+                                "• Connect with industry mentors"
+                            ]
+                            
+                        elif student['quiz_accuracy'] >= 40:
+                            st.warning("**Intermediate Learner**")
+                            learning_path = [
+                                "• Provide guided paths with a mix of practice and theory",
+                                "• Introduce checkpoints for concept reinforcement",
+                                "• Award badges and certificates for milestone achievements",
+                                "• Offer personalized feedback highlighting strengths and improvement areas",
+                                "• Schedule regular progress check-ins"
+                            ]
+                            
+                        else:
+                            st.error("**Needs Additional Support**")
+                            learning_path = [
+                                "• Break content into smaller, digestible chunks",
+                                "• Provide additional learning support and repetition where needed",
+                                "• Assign mentors or study buddies for personal guidance",
+                                "• Award badges and certificates for milestone achievements",
+                                "• Offer personalized feedback highlighting strengths and improvement areas",
+                                "• Schedule weekly check-ins with instructors"
+                            ]
+                        
+                        st.markdown("\n".join(learning_path))
+                        
                         
                         # Risk factors
                         col1, col2 = st.columns(2)
@@ -281,4 +318,4 @@ if uploaded_file:
                 model_path = os.path.join(model_dir, 'dropout_predictor.pkl')
                 joblib.dump(model, model_path)
             except Exception as e:
-                st.warning(f"⚠️ Could not save model: {str(e)}")
+                st.warning(f"⚠️ Could not save model: {str(e)}")    
