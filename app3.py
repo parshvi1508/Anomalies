@@ -5,7 +5,7 @@ import plotly.express as px
 import plotly.graph_objects as go
 from PIL import Image
 import os
-#from course_recommendation import run_course_recommendation
+from course_recommendation import run_course_recommendation
 from model_utils2 import detect_anomalies, train_model
 import warnings
 warnings.filterwarnings('ignore')
@@ -841,9 +841,9 @@ if st.session_state.page == 'home':
 elif st.session_state.page == 'anomalies':
     run_anomaly_detection(reset_to_home)
 
-# Course Recommendation Page
-#elif st.session_state.page == 'recommendations':
-    #run_course_recommendation(reset_to_home)
+# Course Recommendation Page - Updated to include the course recommendation functionality
+elif st.session_state.page == 'recommendations':
+    run_course_recommendation(reset_to_home)
 
 if __name__ == "__main__":
     # This will run when the script is executed directly

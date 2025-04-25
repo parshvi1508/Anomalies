@@ -1,463 +1,445 @@
-import streamlit as st
+# course_recommendations.py
 import pandas as pd
 import numpy as np
-import os
-import plotly.express as px
 from sklearn.feature_extraction.text import TfidfVectorizer
-from sklearn.metrics.pairwise import cosine_similarity
-from sklearn.preprocessing import MinMaxScaler
-import joblib
+from sklearn.metrics.pairwise import linear_kernel
+import streamlit as st
+import re
+import os
 
-def run_course_recommendation(reset_callback):
-    """Run the course recommendation section of the app"""
-    st.title("📚 Course Recommendation System")
-    st.button("← Back to Home", on_click=reset_callback)
-    
-    st.markdown("""
-        Get personalized course recommendations based on your preferences and interests.
-        Upload a course catalog or use our sample data to begin.
-    """)
-    
-    # Load the user survey data
-    user_data = load_user_data()
-    
-    if user_data is not None:
-        # Create course data from survey responses
-        course_data = extract_course_data(user_data)
-        
-        # Input method selection
-        method = st.radio("Select input method:", ["Enter Your Information", "Use Sample Profile"])
-        
-        if method == "Enter Your Information":
-            user_profile = get_user_input()
-            
-            if st.button("Generate Recommendations"):
-                if user_profile:
-                    recommendations = recommend_courses_for_user(user_profile, course_data)
-                    display_recommendations(recommendations, user_profile)
-                else:
-                    st.warning("Please fill in your information to get recommendations.")
-                    
-        else:  # Use Sample Profile
-            sample_profile = get_sample_profile()
-            st.subheader("Sample User Profile")
-            display_user_profile(sample_profile)
-            
-            if st.button("Generate Recommendations"):
-                recommendations = recommend_courses_for_user(sample_profile, course_data)
-                display_recommendations(recommendations, sample_profile)
-                
-        # Show data exploration section
-        show_data_exploration(user_data, course_data)
+# Constants
+SIMILARITY_WEIGHT = 0.6
+RATING_WEIGHT = 0.4
 
-def load_user_data():
-    """Load the user survey data from CSV"""
-    try:
-        df = pd.read_csv('Course_Recommender_500_Users.csv')
-        return df
-    except Exception as e:
-        st.error(f"Error loading user survey data: {str(e)}")
-        st.info("You can upload your own CSV file with user data:")
-        uploaded_file = st.file_uploader("Upload User Data CSV", type=["csv"])
-        if uploaded_file is not None:
-            try:
-                df = pd.read_csv(uploaded_file)
-                return df
-            except Exception as e:
-                st.error(f"Error loading uploaded file: {str(e)}")
-        return None
-
-def extract_course_data(user_data):
-    """Extract course information from user survey data"""
-    # For each platform, gather the interests, rating, difficulty level, etc.
-    platforms = user_data['Which online Learning Platform due to prefer ?'].dropna().str.strip().unique()
+def load_course_data(file_path='udemy_courses.csv'):
+    """Load and preprocess course data"""
+    courses_df = pd.read_csv(file_path)
+    courses_df = courses_df.fillna('')
     
-    course_data = []
+    # Create a skills field from course_title and subject
+    courses_df['skills'] = courses_df['course_title'] + ' ' + courses_df['subject']
     
-    for platform in platforms:
-        # Get users who prefer this platform
-        platform_users = user_data[user_data['Which online Learning Platform due to prefer ?'] == platform]
+    # Convert price to numeric
+    courses_df['price'] = pd.to_numeric(courses_df['price'], errors='coerce')
+    
+    # Calculate rating proxy using num_reviews and num_subscribers
+    if 'num_reviews' in courses_df.columns and 'num_subscribers' in courses_df.columns:
+        courses_df['normalized_reviews'] = normalize_column(courses_df, 'num_reviews')
+        courses_df['normalized_subscribers'] = normalize_column(courses_df, 'num_subscribers')
         
-        # Extract interests for this platform
-        interests = platform_users[' Interest'].dropna().str.split(';').explode().str.strip()
-        unique_interests = interests.unique()
-        
-        for interest in unique_interests:
-            # Calculate average engagement and satisfaction for this platform and interest
-            platform_interest_users = platform_users[platform_users[' Interest'].str.contains(interest, na=False)]
-            
-            if len(platform_interest_users) > 0:
-                # Convert engagement and satisfaction to numerical values
-                engagement_map = {
-                    'Not Engaging': 1, 'Somewhat Engaging': 2, 'Very Engaging': 3
-                }
-                satisfaction_map = {
-                    'Not Satisfied': 1, 'Somewhat Satisfied': 2, 'Very Satisfied': 3
-                }
-                
-                # Map text values to numerical scores with error handling
-                engagement_scores = platform_interest_users['How engaging and interesting did you find the course content (presentations, videos, activities)? '].apply(
-                    lambda x: engagement_map.get(x, 0) if pd.notna(x) else 0
-                )
-                satisfaction_scores = platform_interest_users['How satisfied were you with the learning experience on this platform? '].apply(
-                    lambda x: satisfaction_map.get(x, 0) if pd.notna(x) else 0
-                )
-                
-                avg_rating = (engagement_scores.mean() + satisfaction_scores.mean()) / 2
-                if pd.isna(avg_rating):
-                    avg_rating = 2.0  # Default to middle rating if no data
-                
-                # Extract common difficulty levels
-                knowledge_levels = platform_interest_users['Your Knowledge Level: (Select one)'].value_counts().index.tolist()
-                difficulty = knowledge_levels[0] if knowledge_levels else "Intermediate (Some Foundational Knowledge)"
-                
-                # Extract common cost preferences
-                cost_prefs = platform_interest_users['Course Cost: (Select your preference)'].value_counts().index.tolist()
-                cost_pref = cost_prefs[0] if cost_prefs else "Either, based on value"
-                
-                # Create a course entry
-                course = {
-                    'course_id': f"{platform}_{interest.replace(' ', '_')}",
-                    'platform': platform,
-                    'course_name': f"{interest.strip()} on {platform}",
-                    'category': interest.strip(),
-                    'skills': interest.strip(),
-                    'rating': round(avg_rating, 2),
-                    'difficulty_level': difficulty,
-                    'cost_preference': cost_pref,
-                    'user_count': len(platform_interest_users)
-                }
-                
-                course_data.append(course)
+        # Combine normalized reviews and subscribers as a proxy for rating
+        courses_df['normalized_rating'] = (
+            0.7 * courses_df['normalized_reviews'] + 
+            0.3 * courses_df['normalized_subscribers']
+        )
+    else:
+        courses_df['normalized_rating'] = 0.5  # Default if no ratings
     
-    return pd.DataFrame(course_data)
-
-def get_user_input():
-    """Get user preferences for recommendation"""
-    st.subheader("Your Interests and Preferences")
+    # Map cost and knowledge level
+    courses_df['cost_type'] = courses_df['is_paid'].apply(lambda x: 'Paid' if x == True else 'Free')
     
-    # Domain of interest
-    domain_options = [
-        "Programming Languages", 
-        "Data Science", 
-        "Business", 
-        "Design", 
-        "Marketing", 
-        "Soft Skills"
-    ]
-    domain = st.multiselect("Select your domains of interest:", domain_options)
-    
-    # Experience level
-    difficulty_options = [
-        "Beginner (No Prior Knowledge)",
-        "Intermediate (Some Foundational Knowledge)",
-        "Advanced (Solid Foundational Knowledge)"
-    ]
-    difficulty = st.selectbox("Your experience level:", difficulty_options)
-    
-    # Cost preference
-    cost_options = [
-        "Free", 
-        "Paid", 
-        "Either, based on value"
-    ]
-    cost_pref = st.selectbox("Your cost preference:", cost_options)
-    
-    # Additional preferences
-    col1, col2 = st.columns(2)
-    with col1:
-        importance_of_ratings = st.slider("Importance of course ratings:", 1, 10, 7)
-    with col2:
-        importance_of_content = st.slider("Importance of content match:", 1, 10, 8)
-    
-    if not domain:
-        st.warning("Please select at least one domain of interest.")
-        return None
-    
-    # Create user profile
-    user_profile = {
-        'domain': "; ".join(domain),
-        'difficulty': difficulty,
-        'cost_preference': cost_pref,
-        'importance_of_ratings': importance_of_ratings / 10,  # Normalize to 0-1
-        'importance_of_content': importance_of_content / 10   # Normalize to 0-1
+    level_mapping = {
+        'Beginner Level': 'Beginner',
+        'Intermediate Level': 'Intermediate',
+        'Expert Level': 'Advanced',
+        'All Levels': 'All Levels'
     }
+    courses_df['knowledge_level'] = courses_df['level'].map(level_mapping).fillna('All Levels')
+    
+    return courses_df
+
+def normalize_column(df, column_name):
+    """Normalize a column to a 0-1 scale"""
+    max_val = df[column_name].max()
+    min_val = df[column_name].min()
+    if max_val > min_val:
+        return (df[column_name] - min_val) / (max_val - min_val)
+    else:
+        return pd.Series(0.5, index=df.index)
+
+def preprocess_text(text):
+    """Preprocess text for better TF-IDF results"""
+    text = str(text).lower()
+    text = re.sub(r'[^\w\s]', ' ', text)
+    text = re.sub(r'\s+', ' ', text).strip()
+    return text
+
+def create_tfidf_vectorizer(courses_df):
+    """Create and fit a TF-IDF vectorizer on course skills"""
+    course_skills = courses_df['skills'].apply(preprocess_text).tolist()
+    
+    # Create and fit the TF-IDF vectorizer
+    tfidf = TfidfVectorizer(analyzer='word', ngram_range=(1, 2), min_df=0.0, stop_words='english')
+    tfidf_matrix = tfidf.fit_transform(course_skills)
+    
+    return tfidf, tfidf_matrix
+
+def recommend_courses_for_user(user_profile, courses_df, tfidf_vectorizer, tfidf_matrix, top_n=5):
+    """Recommend courses for a user based on their profile"""
+    # Extract user preferences
+    domain_of_interest = user_profile.get('domain_of_interest', '')
+    cost_preference = user_profile.get('cost_preference', 'Free')
+    knowledge_level = user_profile.get('knowledge_level', 'Beginner')
+    
+    # Preprocess domain of interest
+    domain_of_interest = preprocess_text(domain_of_interest)
+    
+    # Filter courses based on cost preference
+    if cost_preference == 'Free':
+        filtered_courses = courses_df[courses_df['cost_type'] == 'Free']
+    elif cost_preference == 'Paid':
+        filtered_courses = courses_df[courses_df['cost_type'] == 'Paid']
+    else:
+        filtered_courses = courses_df
+    
+    # Filter courses based on knowledge level
+    if knowledge_level == 'Beginner':
+        level_filter = filtered_courses['knowledge_level'].isin(['Beginner', 'All Levels'])
+    elif knowledge_level == 'Intermediate':
+        level_filter = filtered_courses['knowledge_level'].isin(['Intermediate', 'All Levels'])
+    elif knowledge_level == 'Advanced':
+        level_filter = filtered_courses['knowledge_level'].isin(['Advanced', 'All Levels'])
+    else:
+        level_filter = True
+    
+    filtered_courses = filtered_courses[level_filter]
+    
+    # If no courses match the filters, return empty DataFrame
+    if filtered_courses.empty:
+        return pd.DataFrame()
+    
+    # Vectorize user's domain of interest
+    user_vector = tfidf_vectorizer.transform([domain_of_interest])
+    
+    # Calculate similarity scores between user's interest and filtered courses
+    indices = filtered_courses.index.tolist()
+    
+    # Using linear_kernel for cosine similarity (faster than cosine_similarity for TF-IDF)
+    similarity_scores = linear_kernel(user_vector, tfidf_matrix[indices]).flatten()
+    
+    # Create a DataFrame with filtered courses and their similarity scores
+    recommendations = filtered_courses.copy()
+    recommendations['similarity_score'] = similarity_scores
+    
+    # Calculate final score combining similarity and rating
+    recommendations['final_score'] = (
+        SIMILARITY_WEIGHT * recommendations['similarity_score'] + 
+        RATING_WEIGHT * recommendations['normalized_rating']
+    )
+    
+    # Sort by final score and return top N recommendations
+    recommendations = recommendations.sort_values('final_score', ascending=False).head(top_n)
+    
+    return recommendations[['course_id', 'course_title', 'level', 'cost_type', 'price', 
+                          'similarity_score', 'final_score', 'url']]
+
+def parse_user_survey_data(survey_row):
+    """Parse user data from survey response"""
+    user_profile = {
+        'domain_of_interest': '',
+        'cost_preference': 'Free',
+        'knowledge_level': 'Beginner'
+    }
+    
+    # Extract domain of interest
+    domain_field = 'Domain of Interest: (Select all that apply)'
+    if domain_field in survey_row and pd.notna(survey_row[domain_field]):
+        domain_interests = []
+        interests = str(survey_row[domain_field]).split(';')
+        for interest in interests:
+            main_category = interest.split('(')[0].strip()
+            domain_interests.append(main_category)
+        
+        user_profile['domain_of_interest'] = ' '.join(domain_interests)
+    
+    # Extract cost preference
+    cost_field = 'Course Cost: (Select your preference)'
+    if cost_field in survey_row and pd.notna(survey_row[cost_field]):
+        if 'Free' in str(survey_row[cost_field]):
+            user_profile['cost_preference'] = 'Free'
+        elif 'Paid' in str(survey_row[cost_field]):
+            user_profile['cost_preference'] = 'Paid'
+    
+    # Extract knowledge level
+    knowledge_field = 'Your Knowledge Level: (Select one)'
+    if knowledge_field in survey_row and pd.notna(survey_row[knowledge_field]):
+        if 'Beginner' in str(survey_row[knowledge_field]):
+            user_profile['knowledge_level'] = 'Beginner'
+        elif 'Intermediate' in str(survey_row[knowledge_field]):
+            user_profile['knowledge_level'] = 'Intermediate'
+        elif 'Advanced' in str(survey_row[knowledge_field]):
+            user_profile['knowledge_level'] = 'Advanced'
     
     return user_profile
 
-def get_sample_profile():
-    """Return a sample user profile for demonstration"""
-    return {
-        'domain': "Data Science; Programming Languages",
-        'difficulty': "Intermediate (Some Foundational Knowledge)",
-        'cost_preference': "Either, based on value",
-        'importance_of_ratings': 0.7,
-        'importance_of_content': 0.8
-    }
+class CourseRecommender:
+    """A class to handle course recommendations"""
+    def __init__(self, course_data_path='udemy_courses.csv'):
+        """Initialize the recommender"""
+        self.courses_df = load_course_data(course_data_path)
+        self.tfidf_vectorizer, self.tfidf_matrix = create_tfidf_vectorizer(self.courses_df)
+    
+    def recommend_courses(self, user_profile, top_n=5):
+        """Recommend courses for a user"""
+        return recommend_courses_for_user(
+            user_profile, 
+            self.courses_df, 
+            self.tfidf_vectorizer, 
+            self.tfidf_matrix, 
+            top_n
+        )
+    
+    def recommend_courses_from_survey(self, survey_row, top_n=5):
+        """Recommend courses based on survey response"""
+        user_profile = parse_user_survey_data(survey_row)
+        return self.recommend_courses(user_profile, top_n)
 
-def display_user_profile(profile):
-    """Display user profile information"""
-    col1, col2 = st.columns(2)
-    with col1:
-        st.markdown(f"**Domains of Interest:** {profile['domain']}")
-        st.markdown(f"**Experience Level:** {profile['difficulty']}")
-    with col2:
-        st.markdown(f"**Cost Preference:** {profile['cost_preference']}")
-        st.markdown(f"**Rating Importance:** {profile['importance_of_ratings']:.1f}")
-        st.markdown(f"**Content Match Importance:** {profile['importance_of_content']:.1f}")
+def extract_knowledge_domains(survey_df):
+    """Extract unique knowledge domains from survey data"""
+    domains = set()
+    domain_field = 'Domain of Interest: (Select all that apply)'
+    
+    if domain_field in survey_df.columns:
+        for interests in survey_df[domain_field].dropna():
+            for interest in str(interests).split(';'):
+                domain = interest.split('(')[0].strip()
+                if domain:
+                    domains.add(domain)
+    
+    return sorted(list(domains))
 
-def recommend_courses_for_user(user_profile, course_data, top_n=5):
-    """Recommend courses based on user profile
+def run_course_recommendation(reset_callback):
+    """Run the course recommendation section of the app"""
+    st.markdown("<h1 class='sub-header'>📚 Course Recommendation Engine</h1>", unsafe_allow_html=True)
+    st.button("← Back to Home", on_click=reset_callback)
     
-    Implementation follows the specification:
-    1. Filtering by user preferences
-    2. Similarity calculation using TF-IDF
-    3. Scoring with weighted combination
-    4. Returning top N recommendations
-    """
-    if course_data.empty:
-        return pd.DataFrame()
+    st.markdown("""
+        This recommendation engine suggests courses based on your interests and preferences.
+        Fill out the form below to get personalized course recommendations.
+    """)
     
-    # Filter courses based on user's preferences
-    filtered_courses = course_data.copy()
-    
-    # If user has specific cost preference (not "Either"), filter by it
-    if user_profile['cost_preference'] != "Either, based on value":
-        filtered_courses = filtered_courses[
-            (filtered_courses['cost_preference'] == user_profile['cost_preference']) | 
-            (filtered_courses['cost_preference'] == "Either, based on value")
-        ]
-    
-    # Filter by difficulty level - match user's level
-    if user_profile['difficulty'] == "Beginner (No Prior Knowledge)":
-        filtered_courses = filtered_courses[
-            filtered_courses['difficulty_level'] != "Advanced (Solid Foundational Knowledge)"
-        ]
-    elif user_profile['difficulty'] == "Advanced (Solid Foundational Knowledge)":
-        filtered_courses = filtered_courses[
-            filtered_courses['difficulty_level'] != "Beginner (No Prior Knowledge)"
-        ]
-    
-    if filtered_courses.empty:
-        # If filtering removed all courses, revert to original dataset
-        filtered_courses = course_data.copy()
-    
-    # Calculate similarity between user interests and course categories
-    # Using TF-IDF for text similarity
-    
-    # Prepare TF-IDF vectorizer
-    tfidf_vectorizer = TfidfVectorizer(stop_words='english')
-    
-    # Create corpus of course categories and user domains
-    course_categories = filtered_courses['category'].fillna('').tolist()
-    domains = [user_profile['domain']]
-    corpus = course_categories + domains
-    
-    # Calculate TF-IDF matrix
-    tfidf_matrix = tfidf_vectorizer.fit_transform(corpus)
-    
-    # Calculate cosine similarity between user domains and course categories
-    user_vector = tfidf_matrix[-1]  # Last item is the user's domain vector
-    course_vectors = tfidf_matrix[:-1]  # All other items are course vectors
-    
-    # Calculate similarity scores
-    similarity_scores = cosine_similarity(user_vector, course_vectors).flatten()
-    
-    # Add similarity scores to filtered courses
-    filtered_courses['similarity'] = similarity_scores
-    
-    # Calculate final score
-    # Weighted combination: 0.6 * similarity + 0.4 * normalized_rating
-    rating_weight = 0.4  # Default weight
-    similarity_weight = 0.6  # Default weight
-    
-    # Override with user preferences if available
-    if 'importance_of_ratings' in user_profile and 'importance_of_content' in user_profile:
-        # Normalize weights to sum to 1
-        total = user_profile['importance_of_ratings'] + user_profile['importance_of_content']
-        if total > 0:
-            rating_weight = user_profile['importance_of_ratings'] / total
-            similarity_weight = user_profile['importance_of_content'] / total
-    
-    # Normalize ratings to 0-1 scale (assuming ratings are 1-5)
-    filtered_courses['normalized_rating'] = filtered_courses['rating'] / 3
-    
-    # Apply weighting
-    filtered_courses['score'] = (
-        similarity_weight * filtered_courses['similarity'] + 
-        rating_weight * filtered_courses['normalized_rating']
-    )
-    
-    # Sort by score and return top N recommendations
-    recommendations = filtered_courses.sort_values('score', ascending=False).head(top_n)
-    
-    return recommendations
-
-def display_recommendations(recommendations, user_profile):
-    """Display course recommendations with visualizations"""
-    if recommendations.empty:
-        st.warning("No suitable courses found based on your preferences. Try adjusting your filters.")
-        return
-    
-    st.subheader("📚 Your Recommended Courses")
-    
-    # Show each recommendation
-    for i, (_, course) in enumerate(recommendations.iterrows()):
-        col1, col2 = st.columns([1, 3])
+    try:
+        # Check if survey data exists and load it
+        survey_df = None
+        if os.path.exists('Course-Recommender-System.csv'):
+            survey_df = pd.read_csv('Course-Recommender-System.csv')
+        
+        # Initialize the recommender with courses
+        recommender = CourseRecommender()
+        
+        # Dashboard layout
+        col1, col2 = st.columns([1, 2])
         
         with col1:
-            # Platform badge/icon
-            platform_badge = get_platform_badge(course['platform'])
-            st.markdown(platform_badge, unsafe_allow_html=True)
+            st.markdown("<h3>🧑‍💻 Your Preferences</h3>", unsafe_allow_html=True)
             
-            # Rating
-            rating_stars = "⭐" * int(round(course['rating']))
-            st.markdown(f"**Rating:** {rating_stars} ({course['rating']:.1f})")
+            # User profile input form
+            with st.form("user_profile_form"):
+                # Domains of interest
+                if survey_df is not None:
+                    domains = extract_knowledge_domains(survey_df)
+                    domain_options = domains if domains else ["Programming", "Data Science", "Business", "Design", "Marketing"]
+                else:
+                    domain_options = ["Programming", "Data Science", "Business", "Design", "Marketing"]
+                
+                selected_domains = st.multiselect(
+                    "Select your domains of interest:",
+                    options=domain_options,
+                    default=domain_options[:1] if domain_options else []
+                )
+                
+                # Cost preference
+                cost_preference = st.selectbox(
+                    "Course cost preference:",
+                    options=["Any", "Free", "Paid"],
+                    index=0
+                )
+                
+                # Knowledge level
+                knowledge_level = st.selectbox(
+                    "Your knowledge level:",
+                    options=["Beginner", "Intermediate", "Advanced", "All Levels"],
+                    index=0
+                )
+                
+                # Number of recommendations
+                num_recommendations = st.slider(
+                    "Number of recommendations:",
+                    min_value=3,
+                    max_value=10,
+                    value=5
+                )
+                
+                # Additional preferences (optional)
+                with st.expander("Additional Preferences (Optional)"):
+                    max_duration = st.slider(
+                        "Maximum course duration (hours):",
+                        min_value=1,
+                        max_value=20,
+                        value=10
+                    )
+                    
+                    min_rating = st.slider(
+                        "Minimum course rating:",
+                        min_value=1.0,
+                        max_value=5.0,
+                        value=4.0,
+                        step=0.1
+                    )
+                
+                # Submit button
+                submitted = st.form_submit_button("Get Recommendations")
             
-            # Match score percentage
-            match_percent = int(course['similarity'] * 100)
-            st.markdown(f"**Match:** {match_percent}%")
+            # User profile from survey data
+            if survey_df is not None:
+                st.markdown("<h3>📊 or Select from Survey</h3>", unsafe_allow_html=True)
+                
+                if not survey_df.empty:
+                    # Get unique usernames
+                    usernames = survey_df['Username'].dropna().unique()
+                    
+                    if len(usernames) > 0:
+                        selected_user = st.selectbox(
+                            "Select a user from survey data:",
+                            options=usernames
+                        )
+                        
+                        use_survey_data = st.button("Use This User's Preferences")
+                    else:
+                        st.warning("No usernames found in survey data")
+                        use_survey_data = False
+                else:
+                    st.warning("Survey data is empty")
+                    use_survey_data = False
         
         with col2:
-            st.markdown(f"### {i+1}. {course['course_name']}")
-            st.markdown(f"**Category:** {course['category']}")
-            st.markdown(f"**Difficulty:** {course['difficulty_level']}")
-            st.markdown(f"**Cost:** {course['cost_preference']}")
+            st.markdown("<h3>🎓 Recommended Courses</h3>", unsafe_allow_html=True)
             
-            # Progress bar for total score
-            score_percent = int(course['score'] * 100)
-            st.markdown(f"**Total Score:** {score_percent}%")
-            st.progress(course['score'])
-    
-    # Show why these courses were recommended
-    with st.expander("Why these recommendations?"):
-        st.markdown("""
-        Courses are recommended based on the following factors:
+            # Process recommendations based on form submission
+            if submitted:
+                if not selected_domains:
+                    st.error("Please select at least one domain of interest")
+                else:
+                    # Create user profile
+                    user_profile = {
+                        'domain_of_interest': ' '.join(selected_domains),
+                        'cost_preference': cost_preference,
+                        'knowledge_level': knowledge_level
+                    }
+                    
+                    with st.spinner('Finding the best courses for you...'):
+                        # Get recommendations
+                        recommendations = recommender.recommend_courses(user_profile, num_recommendations)
+                        
+                        if recommendations.empty:
+                            st.warning("No courses match your preferences. Try adjusting your filters.")
+                        else:
+                            # Display recommendations
+                            for i, (_, course) in enumerate(recommendations.iterrows()):
+                                with st.container():
+                                    st.markdown(f"""
+                                    <div class='feature-card recommendation-card'>
+                                        <h4>{i+1}. {course['course_title']}</h4>
+                                        <p><b>Level:</b> {course['level']} | <b>Cost:</b> {course['cost_type']} {f"(${course['price']:.2f})" if course['cost_type'] == 'Paid' else ''}</p>
+                                        <p><b>Match Score:</b> {course['similarity_score']*100:.1f}% | <b>Overall Score:</b> {course['final_score']*100:.1f}%</p>
+                                        <p><a href="{course['url']}" target="_blank">View Course</a></p>
+                                    </div>
+                                    """, unsafe_allow_html=True)
+                                    st.markdown("---")
+            
+            # Process recommendations based on survey selection
+            elif 'use_survey_data' in locals() and use_survey_data and 'selected_user' in locals():
+                with st.spinner('Finding the best courses based on survey data...'):
+                    # Get the selected user's data
+                    user_row = survey_df[survey_df['Username'] == selected_user].iloc[0]
+                    
+                    # Get recommendations from survey data
+                    recommendations = recommender.recommend_courses_from_survey(user_row, num_recommendations)
+                    
+                    if recommendations.empty:
+                        st.warning("No courses match this user's preferences. Try another user or adjust filters manually.")
+                    else:
+                        # Display user preferences from survey
+                        user_profile = parse_user_survey_data(user_row)
+                        
+                        st.markdown("<h4>User's Preferences:</h4>", unsafe_allow_html=True)
+                        st.markdown(f"**Domains of Interest:** {user_profile['domain_of_interest']}")
+                        st.markdown(f"**Cost Preference:** {user_profile['cost_preference']}")
+                        st.markdown(f"**Knowledge Level:** {user_profile['knowledge_level']}")
+                        st.markdown("---")
+                        
+                        # Display recommendations
+                        for i, (_, course) in enumerate(recommendations.iterrows()):
+                            with st.container():
+                                st.markdown(f"""
+                                <div class='feature-card recommendation-card'>
+                                    <h4>{i+1}. {course['course_title']}</h4>
+                                    <p><b>Level:</b> {course['level']} | <b>Cost:</b> {course['cost_type']} {f"(${course['price']:.2f})" if course['cost_type'] == 'Paid' else ''}</p>
+                                    <p><b>Match Score:</b> {course['similarity_score']*100:.1f}% | <b>Overall Score:</b> {course['final_score']*100:.1f}%</p>
+                                    <p><a href="{course['url']}" target="_blank">View Course</a></p>
+                                </div>
+                                """, unsafe_allow_html=True)
+                                st.markdown("---")
+            else:
+                # Display placeholder when no recommendations yet
+                st.info("Fill out the form and click 'Get Recommendations' to see personalized course suggestions.")
+                
+                # Alternative courses display for exploration
+                with st.expander("Browse Popular Courses", expanded=False):
+                    # Simply show top-rated courses as a fallback
+                    popular_courses = recommender.courses_df.sort_values('normalized_rating', ascending=False).head(5)
+                    for i, (_, course) in enumerate(popular_courses.iterrows()):
+                        st.markdown(f"**{i+1}. {course['course_title']}**")
+                        st.markdown(f"Level: {course['level']} | Cost: {course['cost_type']}")
+                        st.markdown(f"[View Course]({course['url']})")
+                        st.markdown("---")
         
-        1. **Content Match**: How well the course content matches your interests
-        2. **Rating**: The average rating of the course from other users
-        3. **Difficulty Level**: Courses that match your expertise level
-        4. **Cost Preference**: Courses that match your cost preference
-        
-        The final score is a weighted combination of these factors, with content match
-        and rating being the most important.
-        """)
+        # Analytics section
+        with st.expander("📊 Recommendation Analytics", expanded=False):
+            st.markdown("### Insights from Course Data")
+            
+            # Calculate analytics
+            courses_df = recommender.courses_df
+            
+            # Distribution of courses by level
+            level_counts = courses_df['knowledge_level'].value_counts().reset_index()
+            level_counts.columns = ['Level', 'Count']
+            
+            # Distribution of courses by cost type
+            cost_counts = courses_df['cost_type'].value_counts().reset_index()
+            cost_counts.columns = ['Cost Type', 'Count']
+            
+            # Layout for charts
+            chart_col1, chart_col2 = st.columns(2)
+            
+            with chart_col1:
+                st.subheader("Courses by Level")
+                st.bar_chart(level_counts.set_index('Level'))
+            
+            with chart_col2:
+                st.subheader("Courses by Cost")
+                st.bar_chart(cost_counts.set_index('Cost Type'))
+            
+            # Course subjects analysis
+            if 'subject' in courses_df.columns:
+                subject_counts = courses_df['subject'].value_counts().head(10).reset_index()
+                subject_counts.columns = ['Subject', 'Count']
+                
+                st.subheader("Top Course Subjects")
+                st.bar_chart(subject_counts.set_index('Subject'))
     
-    # Visualization of recommendations
-    st.subheader("Recommendation Analysis")
-    
-    # Bar chart comparing different courses
-    fig = px.bar(
-        recommendations,
-        y="course_name",
-        x=["similarity", "normalized_rating"],
-        labels={"value": "Score", "variable": "Factor"},
-        title="Recommendation Factors by Course",
-        orientation='h',
-        barmode='group',
-        height=400
-    )
-    st.plotly_chart(fig, use_container_width=True)
-    
-    # Radar chart showing how different platforms meet needs
-    platform_data = recommendations.groupby('platform').agg({
-        'similarity': 'mean',
-        'normalized_rating': 'mean',
-        'score': 'mean',
-        'course_name': 'count'
-    }).reset_index()
-    platform_data.rename(columns={'course_name': 'course_count'}, inplace=True)
-    
-    if len(platform_data) > 1:
-        fig = px.line_polar(
-            platform_data, 
-            r="score", 
-            theta="platform", 
-            line_close=True,
-            range_r=[0,1],
-            title="Platform Comparison"
-        )
-        st.plotly_chart(fig, use_container_width=True)
+    except Exception as e:
+        st.error(f"An error occurred: {str(e)}")
+        import traceback
+        st.error(traceback.format_exc())
 
-def get_platform_badge(platform):
-    """Return HTML for a platform badge"""
-    platform = platform.lower()
-    color = "#3366cc"  # Default blue
+if __name__ == "__main__":
+    # This allows running this file directly for testing
+    st.set_page_config(page_title="Course Recommender", layout="wide")
     
-    if "coursera" in platform:
-        color = "#0056D2"
-    elif "udemy" in platform:
-        color = "#A435F0"
-    elif "linkedin" in platform:
-        color = "#0077B5"
-    elif "edx" in platform:
-        color = "#01262F"
-    elif "youtube" in platform:
-        color = "#FF0000"
+    # Placeholder for reset callback
+    def temp_reset():
+        pass
     
-    return f'<div style="background-color: {color}; color: white; padding: 8px; border-radius: 4px; text-align: center; font-weight: bold;">{platform}</div>'
-
-def show_data_exploration(user_data, course_data):
-    """Show data exploration visualizations"""
-    with st.expander("📊 Data Exploration", expanded=False):
-        if user_data is not None:
-            col1, col2 = st.columns(2)
-            
-            with col1:
-                # Platform popularity
-                platform_counts = user_data['Which online Learning Platform due to prefer ?'].value_counts().reset_index()
-                platform_counts.columns = ['Platform', 'Count']
-                
-                fig = px.bar(
-                    platform_counts.head(10), 
-                    x='Platform', 
-                    y='Count',
-                    title="Most Popular Learning Platforms"
-                )
-                st.plotly_chart(fig, use_container_width=True)
-            
-            with col2:
-                # Interest areas
-                interests = user_data[' Interest'].dropna().str.split(';').explode().str.strip()
-                interest_counts = interests.value_counts().reset_index()
-                interest_counts.columns = ['Interest', 'Count']
-                
-                fig = px.pie(
-                    interest_counts.head(5), 
-                    values='Count', 
-                    names='Interest',
-                    title="Top Interest Areas"
-                )
-                st.plotly_chart(fig, use_container_width=True)
-        
-        if not course_data.empty:
-            # Course data exploration
-            col1, col2 = st.columns(2)
-            
-            with col1:
-                # Ratings by platform
-                avg_ratings = course_data.groupby('platform')['rating'].mean().reset_index()
-                
-                fig = px.bar(
-                    avg_ratings, 
-                    x='platform', 
-                    y='rating',
-                    title="Average Rating by Platform",
-                    color='rating',
-                    color_continuous_scale='RdYlGn'
-                )
-                st.plotly_chart(fig, use_container_width=True)
-            
-            with col2:
-                # Categories by popularity
-                category_counts = course_data['category'].value_counts().reset_index()
-                category_counts.columns = ['Category', 'Count']
-                
-                fig = px.bar(
-                    category_counts.head(10), 
-                    x='Count', 
-                    y='Category',
-                    title="Most Popular Categories",
-                    orientation='h'
-                )
-                st.plotly_chart(fig, use_container_width=True)
+    # Run the recommendation page
+    run_course_recommendation(temp_reset)
